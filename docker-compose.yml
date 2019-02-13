@@ -5,9 +5,11 @@ services:
     depends_on:
       - camundadb
     ports:
-      - "8080:8080"
+      - '8080:8080'
     networks:
+      - data
       - frontend
+      - scanner
     labels:
       container_group: core
     volumes:
@@ -25,7 +27,7 @@ services:
       - SECURECODEBOX_PERSISTENCE_ELASTICSEARCH_INDEX_DELETE_ON_INIT=false
       #DefectDojo Configuration
       - SECURECODEBOX_PERSISTENCE_DEFECTDOJO_ENABLED=${ENABLE_DEFECT_DOJO}
-      - SECURECODEBOX_PERSISTENCE_DEFECTDOJO_URL=http://persistence-defect-dojo:8000
+      - SECURECODEBOX_PERSISTENCE_DEFECTDOJO_URL=http://persistence-defectdojo:8000
       - SECURECODEBOX_PERSISTENCE_DEFECTDOJO_AUTH_KEY=${DEFECT_DOJO_API_KEY}
       - SECURECODEBOX_PERSISTENCE_DEFECTDOJO_AUTH_NAME=admin
       - SECURECODEBOX_DEFAULT_TARGET_NAME=JuiceShop Test Host
@@ -40,27 +42,27 @@ services:
     restart: on-failure:3
 
   camundadb:
-      image: mysql:5.7
-      networks:
-        - frontend
-      volumes:
-        - camundadb-datastore:/var/lib/mysql
-      labels:
-        container_group: infrastructure
-      command: --max_allowed_packet=65011712      # 512M
-      environment:
-        - MYSQL_ROOT_PASSWORD=${CAMUNDADB_ROOT_PW}
-        - MYSQL_DATABASE=${CAMUNDADB_DATABASE}
-        - MYSQL_USER=${CAMUNDADB_USER}
-        - MYSQL_PASSWORD=${CAMUNDADB_PW}
+    image: mysql:5.7
+    networks:
+      - data
+    volumes:
+      - camundadb-datastore:/var/lib/mysql
+    labels:
+      container_group: infrastructure
+    command: --max_allowed_packet=65011712 # 512M
+    environment:
+      - MYSQL_ROOT_PASSWORD=${CAMUNDADB_ROOT_PW}
+      - MYSQL_DATABASE=${CAMUNDADB_DATABASE}
+      - MYSQL_USER=${CAMUNDADB_USER}
+      - MYSQL_PASSWORD=${CAMUNDADB_PW}
 
   scanner-infrastructure-nmap:
     image: securecodebox/nmap:${DEFAULT_TAG}
     depends_on:
       engine:
-        condition: service_healthy 
+        condition: service_healthy
     networks:
-      - frontend
+      - scanner
     labels:
       container_group: scanner
     environment:
@@ -72,9 +74,9 @@ services:
     image: securecodebox/nikto:${DEFAULT_TAG}
     depends_on:
       engine:
-        condition: service_healthy 
+        condition: service_healthy
     networks:
-      - frontend
+      - scanner
     labels:
       container_group: scanner
     environment:
@@ -83,60 +85,60 @@ services:
       - ENGINE_BASIC_AUTH_PASSWORD=${ENGINE_SCANNERSERVICES_PASSWORD}
 
   scanner-webapplication-zap:
-      image: securecodebox/zap:${DEFAULT_TAG}
-      depends_on:
-        engine:
-          condition: service_healthy 
-      networks:
-        - frontend
-      labels:
-        container_group: scanner
-      environment:
+    image: securecodebox/zap:${DEFAULT_TAG}
+    depends_on:
+      engine:
+        condition: service_healthy
+    networks:
+      - scanner
+    labels:
+      container_group: scanner
+    environment:
       - ENGINE_ADDRESS=http://engine:8080
       - ENGINE_BASIC_AUTH_USER=${ENGINE_SCANNERSERVICES_USER}
       - ENGINE_BASIC_AUTH_PASSWORD=${ENGINE_SCANNERSERVICES_PASSWORD}
       - SECURECODEBOX_ZAP_JOBSSCHEDULERCRON=* * * * * *
 
   scanner-webapplication-sslyze:
-      image: securecodebox/sslyze:${DEFAULT_TAG}
-      depends_on:
-        engine:
-          condition: service_healthy 
-      networks:
-        - frontend
-      labels:
-        container_group: scanner
-      environment:
+    image: securecodebox/sslyze:${DEFAULT_TAG}
+    depends_on:
+      engine:
+        condition: service_healthy
+    networks:
+      - scanner
+    labels:
+      container_group: scanner
+    environment:
       - ENGINE_ADDRESS=http://engine:8080
       - ENGINE_BASIC_AUTH_USER=${ENGINE_SCANNERSERVICES_USER}
       - ENGINE_BASIC_AUTH_PASSWORD=${ENGINE_SCANNERSERVICES_PASSWORD}
 
   scanner-webapplication-arachni:
-      image: securecodebox/arachni:${DEFAULT_TAG}
-      depends_on:
-        engine:
-          condition: service_healthy
-      networks:
-        - frontend
-      labels:
-        container_group: scanner
-      environment:
+    image: securecodebox/arachni:${DEFAULT_TAG}
+    depends_on:
+      engine:
+        condition: service_healthy
+    networks:
+      - scanner
+    labels:
+      container_group: scanner
+    environment:
       - ENGINE_ADDRESS=http://engine:8080
       - ENGINE_BASIC_AUTH_USER=${ENGINE_SCANNERSERVICES_USER}
       - ENGINE_BASIC_AUTH_PASSWORD=${ENGINE_SCANNERSERVICES_PASSWORD}
-      volumes:
-      - "./plugins/arachni-login-scripts:/securecodebox/scripts/"
+    volumes:
+      - './plugins/arachni-login-scripts:/securecodebox/scripts/'
 
   scanner-infrastructure-amass:
-      image: securecodebox/amass:${DEFAULT_TAG}
-      depends_on:
-        engine:
-          condition: service_healthy
-      networks:
-        - frontend
-      labels:
-        container_group: scanner
-      environment:
+    image: securecodebox/amass:${DEFAULT_TAG}
+    depends_on:
+      engine:
+        condition: service_healthy
+    networks:
+      - scanner
+    labels:
+      container_group: scanner
+    environment:
       - ENGINE_ADDRESS=http://engine:8080
       - ENGINE_BASIC_AUTH_USER=${ENGINE_SCANNERSERVICES_USER}
       - ENGINE_BASIC_AUTH_PASSWORD=${ENGINE_SCANNERSERVICES_PASSWORD}
@@ -144,10 +146,10 @@ services:
   persistence-elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.3.1
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - '9200:9200'
+      - '9300:9300'
     networks:
-      - frontend
+      - data
     volumes:
       - persistence-elasticsearch-datastore:/usr/share/elasticsearch/data
     labels:
@@ -161,25 +163,80 @@ services:
     depends_on:
       - persistence-elasticsearch
     ports:
-      - "5601:5601"
+      - '5601:5601'
     networks:
+      - data
       - frontend
     labels:
       container_group: logging
     environment:
       - ELASTICSEARCH_URL=http://persistence-elasticsearch:9200
 
-  persistence-defect-dojo:
-    image: securecodebox/defect-dojo:standalone
-    command: bash -c "export LOAD_SAMPLE_DATA=True && bash /opt/django-DefectDojo/docker/docker-startup.bash"
-    ports:
-      - 8000:8000
+  persistence-defectdojo:
+    image: appsecpipeline/django-defectdojo-dev:slim
+    depends_on:
+      - defectdojodb
+    environment:
+      DEFECT_DOJO_ADMIN_PASSWORD: ${DEFECT_DOJO_ADMIN_PASSWORD:-admin}
+      DEFECT_DOJO_DEFAULT_DATABASE_HOST: 'defectdojodb'
+      DEFECT_DOJO_DEFAULT_DATABASE_PORT: '3306'
+      DEFECT_DOJO_DEFAULT_DATABASE_NAME: 'dojodb'
+      DEFECT_DOJO_DEFAULT_DATABASE_USER: 'dojo'
+      DEFECT_DOJO_DEFAULT_DATABASE_PASSWORD: ${DEFECT_DOJO_DEFAULT_DATABASE_PASSWORD:-dojodbpwd}
+      DD_DATABASE_URL: 'mysql://dojo:${DEFECT_DOJO_DEFAULT_DATABASE_PASSWORD:-dojodbpwd}@defectdojodb:3306/dojodb'
+      DD_ALLOWED_HOSTS: 'persistence-defectdojo,localhost'
+      DD_SECRET_KEY: ${DD_SECRET_KEY:-"hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq"}
+      DD_CREDENTIAL_AES_256_KEY: ${DD_CREDENTIAL_AES_256_KEY:-"&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw"}
+    networks:
+      - data
+      - proxy
+    volumes:
+      - 'defectdojo-static:/opt/django-DefectDojo/static'
+
+  defectdojodb:
+    image: mysql:5.7
+    command: '--default-authentication-plugin=mysql_native_password'
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DEFECT_DOJO_MYSQL_ROOT_PASSWORD:-defectojo}
+      MYSQL_DATABASE: 'dojodb'
+      MYSQL_USER: 'dojo'
+      MYSQL_PASSWORD: ${DEFECT_DOJO_DEFAULT_DATABASE_PASSWORD:-dojodbpwd}
+    networks:
+      - data
+    volumes:
+      - 'defectdojodb-datastore:/var/lib/mysql'
+
+  defectdojo-proxy:
+    image: nginx:latest
+    depends_on:
+      - persistence-defectdojo
     networks:
       - frontend
+      - proxy
+    ports:
+      - '8000:80'
+    volumes:
+      - '$PWD/plugins/defect-dojo/nginx.conf:/etc/nginx/nginx.conf:ro'
+      # This gives Nginx access to the static assets compiled by Django.
+      - 'defectdojo-static:/usr/share/nginx/html/static:ro'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://persistence-defectdojo:8000']
+      interval: 20s
+      timeout: 1s
+      retries: 6
 
 networks:
+  # Contains all services which are intended to be publicly accessible
   frontend:
+  # Contains all persistence related services e.g databases
+  data:
+  # Connects proxies with their underlying services
+  proxy:
+  #  Contains the engine and all scanners communicating with it
+  scanner:
 
 volumes:
   camundadb-datastore:
   persistence-elasticsearch-datastore:
+  defectdojodb-datastore:
+  defectdojo-static:
