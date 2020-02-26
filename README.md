@@ -1,3 +1,5 @@
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/secureCodeBox/secureCodeBox) 
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub release](https://img.shields.io/github/release/secureCodeBox/secureCodeBox.svg)](https://github.com/secureCodeBox/secureCodeBox/releases/latest)
 
